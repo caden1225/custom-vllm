@@ -15,8 +15,11 @@ logger = init_logger(__name__)
 
 
 class RequestLogger:
-    def __init__(self, *, max_log_len: int | None) -> None:
+    def __init__(
+        self, *, max_log_len: int | None, log_prompt: bool = False
+    ) -> None:
         self.max_log_len = max_log_len
+        self.log_prompt = log_prompt
 
         if not logger.isEnabledFor(logging.INFO):
             logger.warning_once(
@@ -24,12 +27,13 @@ class RequestLogger:
                 "the minimum log level is higher than INFO. "
                 "No request information will be logged."
             )
-        elif not logger.isEnabledFor(logging.DEBUG):
+        elif not logger.isEnabledFor(logging.DEBUG) and not self.log_prompt:
             logger.info_once(
                 "`--enable-log-requests` is set but "
                 "the minimum log level is higher than DEBUG. "
                 "Only limited information will be logged to minimize overhead. "
-                "To view more details, set `VLLM_LOGGING_LEVEL=DEBUG`."
+                "To view more details, set `VLLM_LOGGING_LEVEL=DEBUG` "
+                "or `--enable-log-prompt`."
             )
 
     def log_inputs(
@@ -41,22 +45,25 @@ class RequestLogger:
         params: SamplingParams | PoolingParams | BeamSearchParams | None,
         lora_request: LoRARequest | None,
     ) -> None:
+        prompt_to_log = prompt
+        token_ids_to_log = prompt_token_ids
+        if self.max_log_len is not None:
+            if prompt_to_log is not None:
+                prompt_to_log = prompt_to_log[: self.max_log_len]
+            if token_ids_to_log is not None:
+                token_ids_to_log = token_ids_to_log[: self.max_log_len]
+
+        if self.log_prompt:
+            logger.info("Request %s prompt: %r", request_id, prompt_to_log)
+
         if logger.isEnabledFor(logging.DEBUG):
-            max_log_len = self.max_log_len
-            if max_log_len is not None:
-                if prompt is not None:
-                    prompt = prompt[:max_log_len]
-
-                if prompt_token_ids is not None:
-                    prompt_token_ids = prompt_token_ids[:max_log_len]
-
             logger.debug(
                 "Request %s details: prompt: %r, "
                 "prompt_token_ids: %s, "
                 "prompt_embeds shape: %s.",
                 request_id,
-                prompt,
-                prompt_token_ids,
+                prompt_to_log,
+                token_ids_to_log,
                 prompt_embeds.shape if prompt_embeds is not None else None,
             )
 

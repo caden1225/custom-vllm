@@ -269,3 +269,78 @@ def test_streaming_complete_logs_full_text_content():
         assert call_args[1] == "test-streaming-full-text"
         assert call_args[2] == " (streaming complete)"
         assert call_args[4] == "streaming_complete"
+
+
+def test_log_prompt_at_info_without_token_ids():
+    """INFO + log_prompt logs rendered prompt text, not token IDs."""
+    mock_logger = MagicMock()
+    mock_logger.isEnabledFor.side_effect = lambda level: level >= logging.INFO
+
+    with patch("vllm.entrypoints.serve.utils.request_logger.logger", mock_logger):
+        request_logger = RequestLogger(max_log_len=None, log_prompt=True)
+        prompt = "<|im_start|>user\n你好<|im_end|>\n<|im_start|>assistant\n"
+        request_logger.log_inputs(
+            request_id="req-prompt",
+            prompt=prompt,
+            prompt_token_ids=[10, 20, 30, 40],
+            prompt_embeds=None,
+            params=None,
+            lora_request=None,
+        )
+
+        info_msgs = [c.args[0] for c in mock_logger.info.call_args_list]
+        assert any("prompt" in msg for msg in info_msgs)
+        assert all("prompt_token_ids" not in msg for msg in info_msgs)
+        logged_prompt = next(
+            c.args[2]
+            for c in mock_logger.info.call_args_list
+            if "prompt" in c.args[0] and "Received request" not in c.args[0]
+        )
+        assert logged_prompt == prompt
+        mock_logger.debug.assert_not_called()
+
+
+def test_log_prompt_false_omits_prompt_at_info():
+    """Without log_prompt, INFO does not include prompt text."""
+    mock_logger = MagicMock()
+    mock_logger.isEnabledFor.side_effect = lambda level: level >= logging.INFO
+
+    with patch("vllm.entrypoints.serve.utils.request_logger.logger", mock_logger):
+        request_logger = RequestLogger(max_log_len=None, log_prompt=False)
+        request_logger.log_inputs(
+            request_id="req-no-prompt",
+            prompt="secret prompt",
+            prompt_token_ids=[1, 2, 3],
+            prompt_embeds=None,
+            params=None,
+            lora_request=None,
+        )
+
+        assert mock_logger.info.call_count == 1
+        assert "Received request %s" in mock_logger.info.call_args.args[0]
+        assert "secret prompt" not in mock_logger.info.call_args.args
+        mock_logger.debug.assert_not_called()
+
+
+def test_log_prompt_respects_max_log_len():
+    """log_prompt truncates prompt text with max_log_len."""
+    mock_logger = MagicMock()
+    mock_logger.isEnabledFor.side_effect = lambda level: level >= logging.INFO
+
+    with patch("vllm.entrypoints.serve.utils.request_logger.logger", mock_logger):
+        request_logger = RequestLogger(max_log_len=8, log_prompt=True)
+        request_logger.log_inputs(
+            request_id="req-trunc",
+            prompt="0123456789abcdef",
+            prompt_token_ids=list(range(20)),
+            prompt_embeds=None,
+            params=None,
+            lora_request=None,
+        )
+
+        logged_prompt = next(
+            c.args[2]
+            for c in mock_logger.info.call_args_list
+            if "prompt" in c.args[0] and "Received request" not in c.args[0]
+        )
+        assert logged_prompt == "01234567"

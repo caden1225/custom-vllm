@@ -214,6 +214,20 @@ def test_per_request_metrics_requires_log_stats(serve_parser):
         validate_parsed_serve_args(args)
 
 
+def test_enable_log_prompt_requires_log_requests(serve_parser):
+    args = serve_parser.parse_args(args=["--enable-log-prompt"])
+    with pytest.raises(TypeError, match="enable-log-prompt requires"):
+        validate_parsed_serve_args(args)
+
+
+def test_enable_log_prompt_with_log_requests(serve_parser):
+    args = serve_parser.parse_args(
+        args=["--enable-log-requests", "--enable-log-prompt"]
+    )
+    validate_parsed_serve_args(args)
+    assert args.enable_log_prompt is True
+
+
 @pytest.mark.parametrize(
     "cli_args, expected_middleware",
     [

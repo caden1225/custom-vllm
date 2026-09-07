@@ -358,7 +358,10 @@ async def init_app_state(
         served_model_names = [args.model]
 
     if args.enable_log_requests:
-        request_logger = RequestLogger(max_log_len=args.max_log_len)
+        request_logger = RequestLogger(
+            max_log_len=args.max_log_len,
+            log_prompt=args.enable_log_prompt,
+        )
     else:
         request_logger = None
 
@@ -484,7 +487,10 @@ async def init_render_app_state(
     )
 
     if args.enable_log_requests:
-        request_logger = RequestLogger(max_log_len=args.max_log_len)
+        request_logger = RequestLogger(
+            max_log_len=args.max_log_len,
+            log_prompt=args.enable_log_prompt,
+        )
     else:
         request_logger = None
 

@@ -144,6 +144,10 @@ class BaseFrontendArgs:
     """If set to True, log model outputs (generations). Requires
     `--enable-log-requests`. Output text and finish reasons are logged at INFO,
     while output token IDs are logged at DEBUG."""
+    enable_log_prompt: bool = False
+    """If set to True, log the full rendered prompt text at INFO. Requires
+    `--enable-log-requests`. Truncated by `--max-log-len` if set. Token IDs
+    are not logged at INFO (only at DEBUG)."""
     enable_log_deltas: bool = True
     """If set to False, output deltas will not be logged. Relevant only if 
     --enable-log-outputs is set.
@@ -423,6 +427,8 @@ def validate_parsed_serve_args(args: argparse.Namespace):
         raise TypeError("Error: --enable-auto-tool-choice requires --tool-call-parser")
     if args.enable_log_outputs and not args.enable_log_requests:
         raise TypeError("Error: --enable-log-outputs requires --enable-log-requests")
+    if args.enable_log_prompt and not args.enable_log_requests:
+        raise TypeError("Error: --enable-log-prompt requires --enable-log-requests")
 
     if getattr(args, "enable_per_request_metrics", False) and getattr(
         args, "disable_log_stats", False
